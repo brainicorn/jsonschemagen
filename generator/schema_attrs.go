@@ -310,6 +310,10 @@ func (g *JSONSchemaGenerator) addNumericAttrsForField(schema schema.NumericSchem
 
 func (g *JSONSchemaGenerator) populateStringAttrs(schema schema.StringSchema, anno *schemaAnno) {
 
+	if schema == nil || anno == nil {
+		return
+	}
+
 	if anno.format != "" {
 		schema.SetFormat(anno.format)
 	}
@@ -329,6 +333,10 @@ func (g *JSONSchemaGenerator) populateStringAttrs(schema schema.StringSchema, an
 }
 
 func (g *JSONSchemaGenerator) populateNumericAttrs(schema schema.NumericSchema, anno *schemaAnno) {
+
+	if schema == nil || anno == nil {
+		return
+	}
 
 	if anno.maximum > -1 {
 		schema.SetMaximum(anno.maximum)

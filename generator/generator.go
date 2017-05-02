@@ -520,7 +520,7 @@ func (g *JSONSchemaGenerator) generateSchemaForBuiltIn(name string, field *ast.F
 
 	if found {
 		g.LogVerbose("found built-in type ", jsonType)
-		simpleSchema, err = g.generateSimpleSchema(jsonType, field)
+		simpleSchema, err = g.generateSimpleSchema(name, jsonType, field)
 		if err == nil {
 			g.LogVerbose("returning simple schema ", jsonType)
 			return simpleSchema, true, err
@@ -530,29 +530,29 @@ func (g *JSONSchemaGenerator) generateSchemaForBuiltIn(name string, field *ast.F
 	return nil, false, err
 }
 
-func (g *JSONSchemaGenerator) generateSimpleSchema(simpleType string, field *ast.Field) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateSimpleSchema(goType, jsonType string, field *ast.Field) (schema.JSONSchema, error) {
 	var err error
 
-	switch simpleType {
+	switch jsonType {
 	case "string":
 		ss := schema.NewStringSchema()
 		err = g.addStringAttrsForField(ss, field)
 		if nil != field {
 			g.LogDebug("got string, checking if it's a time: ", types.ExprString(field.Type))
-			if types.ExprString(field.Type) == "time.Time" {
+			if goType == "time.Time" || types.ExprString(field.Type) == "time.Time" {
 				g.LogDebug("it's a time, adding date-time format")
 				ss.SetFormat("date-time")
 			}
 		}
 		return ss, err
 	case "number", "integer":
-		ss := schema.NewNumericSchema(simpleType)
+		ss := schema.NewNumericSchema(jsonType)
 		err = g.addNumericAttrsForField(ss, field)
 
 		return ss, err
 	}
 
-	ss := schema.NewSimpleSchema(simpleType)
+	ss := schema.NewSimpleSchema(jsonType)
 
 	return ss, err
 }
