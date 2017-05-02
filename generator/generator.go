@@ -181,10 +181,6 @@ func (g *JSONSchemaGenerator) doGenerate() (schema.JSONSchema, error) {
 		}
 	}
 
-	if err == nil && rootSchema.GetID() == "" {
-		rootSchema.SetID("http://" + rootDeclInfo.pkg.Pkg.Path() + "/" + rootDeclInfo.typeSpec.Name.Name)
-	}
-
 	return rootSchema, err
 }
 
