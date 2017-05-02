@@ -1,0 +1,18 @@
+language: go
+
+go:
+  - 1.8.x
+  - tip
+
+install:
+  - go get github.com/Masterminds/glide
+  - glide --no-color up
+  - go get -u github.com/alecthomas/gometalinter
+  - gometalinter --install
+
+script:
+  - gometalinter --vendor --disable-all --enable=vet --enable=goimports --enable=vetshadow --enable=golint --enable=ineffassign --enable=goconst --tests ./...
+  - ./run-tests.sh
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
