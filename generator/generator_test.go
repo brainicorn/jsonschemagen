@@ -29,6 +29,11 @@ func Generate(pkg, obj string, opts Options) (schema.JSONSchema, error) {
 	return g.Generate()
 }
 
+type RecurseStruct struct {
+	ID     string
+	Myself *RecurseStruct
+}
+
 func (suite *GeneratorTestSuite) TestAttrsMap() {
 	suite.T().Parallel()
 
@@ -181,7 +186,7 @@ func (suite *GeneratorTestSuite) TestObjectAttrs() {
 
 	pkg := "github.com/brainicorn/schematestobjects/artist"
 	opts := NewOptions()
-	opts.LogLevel = QuietLevel
+	opts.LogLevel = InfoLevel
 
 	jsonSchema, err := Generate(pkg, "Individual", opts)
 	objSchema := jsonSchema.(schema.ObjectSchema)
@@ -193,6 +198,22 @@ func (suite *GeneratorTestSuite) TestObjectAttrs() {
 	assert.Equal(suite.T(), true, objSchema.GetAdditionalProperties().Boolean, "additional props should be true, got %t", objSchema.GetAdditionalProperties())
 	assert.Equal(suite.T(), []string{"firstName"}, objSchema.GetRequired(), "required props should be 'firstName, got %v", objSchema.GetRequired())
 
+}
+
+func (suite *GeneratorTestSuite) TestRecurseObject() {
+	suite.T().Parallel()
+
+	pkg := "github.com/brainicorn/jsonschemagen/generator"
+	opts := NewOptions()
+	opts.LogLevel = InfoLevel
+	opts.IncludeTests = true
+
+	jsonSchema, err := Generate(pkg, "RecurseStruct", opts)
+	objSchema := jsonSchema.(schema.ObjectSchema)
+
+	assert.NoError(suite.T(), err)
+
+	assert.Equal(suite.T(), "#", objSchema.GetProperties()["Myself"].GetRef())
 }
 
 func (suite *GeneratorTestSuite) TestAllOf() {
