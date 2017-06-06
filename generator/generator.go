@@ -356,6 +356,14 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 		switch fieldType := fieldExpr.(type) {
 		case *ast.StructType:
 			g.LogVerbose("field type is struct: ")
+			if field != nil {
+				fieldStarExpr, isStar := field.Type.(*ast.StarExpr)
+				if isStar && types.ExprString(fieldStarExpr.X) == ownerDecl.typeSpec.Name.Name {
+					generatedSchema = generateSelfRef()
+					break
+				}
+			}
+
 			generatedSchema, err = g.generateObjectSchema(ownerDecl, field, false)
 
 		case *ast.Ident:
@@ -637,4 +645,11 @@ func (g *JSONSchemaGenerator) generateMapSchema(field *ast.Field) (schema.JSONSc
 	mSchema := schema.NewMapSchema(g.options.SupressXAttrs)
 
 	return mSchema, nil
+}
+
+func generateSelfRef() schema.JSONSchema {
+	refSchema := schema.NewBasicSchema("")
+	refSchema.SetRef("#")
+
+	return refSchema
 }
