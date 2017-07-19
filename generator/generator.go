@@ -357,17 +357,6 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 		switch fieldType := fieldExpr.(type) {
 		case *ast.StructType:
 			g.LogVerbose("field type is struct: ")
-			//			if field != nil {
-			//				fieldStarExpr, isStar := field.Type.(*ast.StarExpr)
-			//				if isStar {
-			//					fmt.Println(fieldStarExpr.X)
-			//					fmt.Println(ownerDecl.typeSpec.Name.Name)
-			//				}
-			//				if isStar && types.ExprString(fieldStarExpr.X) == ownerDecl.typeSpec.Name.Name {
-			//					generatedSchema = generateSelfRef()
-			//					break
-			//				}
-			//			}
 
 			generatedSchema, err = g.generateObjectSchema(ownerDecl, field, false)
 
@@ -428,14 +417,11 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 			}
 
 		case *ast.StarExpr:
-			fmt.Println(ownerDecl)
 			g.LogVerbose("got star expression type ", fieldType.X)
 			g.LogVerbose("selector is ", fieldType.X)
 
 			if field != nil {
 				fieldStarExpr := fieldExpr.(*ast.StarExpr)
-				fmt.Println(fieldStarExpr.X)
-				fmt.Println(ownerDecl.typeSpec.Name.Name)
 				if types.ExprString(fieldStarExpr.X) == ownerDecl.typeSpec.Name.Name {
 					generatedSchema = generateSelfRef()
 					break
@@ -586,16 +572,6 @@ func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr 
 	var err error
 	var elemSchema schema.JSONSchema
 
-	// first we need to check if we need to convert []byte to string instead of an array
-	//	switch elemType := elemExpr.(type) {
-	//	case *ast.Ident:
-	//		g.LogVerbose("field type is ident: ", elemType.Name)
-	//		var ok bool
-	//		if elemSchema, ok, err = g.generateSchemaForBuiltIn("[]"+elemType.Name, field); ok {
-	//			return elemSchema, err
-	//		}
-	//	}
-
 	arraySchema := schema.NewArraySchema()
 
 	err = g.addArrayAttrsForField(arraySchema, field)
@@ -634,6 +610,10 @@ func (g *JSONSchemaGenerator) generateInterfaceSchemaForField(decl *declInfo, fi
 			iSchema = schema.NewObjectSchema(g.options.SupressXAttrs)
 			err = g.addObjectAttrsForDecl(iSchema.(schema.ObjectSchema), decl)
 		}
+
+		if err == nil {
+			err = g.ensureProperTypeForInterfaceField(iSchema, field)
+		}
 	}
 	return iSchema, err
 }
@@ -642,18 +622,8 @@ func (g *JSONSchemaGenerator) generateInterfaceSchemaForDecl(decl *declInfo) (sc
 	var err error
 	//var hasXof bool
 	var iSchema schema.JSONSchema
-
-	//	hasXof, err = g.declHasXofAnnotation(decl)
-
-	//	if err == nil {
-	//		if !hasXof {
-	//			iSchema = schema.NewMapSchema(g.options.SupressXAttrs)
-	//			err = g.addCommonAttrsForDecl(iSchema, decl)
-	//		} else {
 	iSchema = schema.NewObjectSchema(g.options.SupressXAttrs)
 	err = g.addObjectAttrsForDecl(iSchema.(schema.ObjectSchema), decl)
-	//		}
-	//	}
 
 	return iSchema, err
 }

@@ -1,18 +1,73 @@
 package schema
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"strings"
+)
 
 const (
 	// DefinitionRoot is the root of the definition ref
 	DefinitionRoot = "#/definitions/"
 )
 
+// StringOrArray holds a string or a slice of strings for values that can take either.
+// This is used for things like type
+type StringOrArray struct {
+	String string
+	Array  []string
+}
+
+// NewBoolOrSchema creates a *BoolOrSchema based on the given interface.
+func NewStringOrArray(v interface{}) *StringOrArray {
+	s, ok := v.(string)
+	if ok {
+		return &StringOrArray{
+			String: s,
+		}
+	}
+
+	a, ok := v.([]string)
+	if ok {
+		return &StringOrArray{
+			Array: a,
+		}
+	}
+
+	return &StringOrArray{}
+}
+
+// MarshalJSON convert this object to JSON
+func (soa *StringOrArray) MarshalJSON() ([]byte, error) {
+	if len(soa.Array) > 0 {
+		return json.Marshal(soa.Array)
+	}
+
+	return json.Marshal(soa.String)
+}
+
+// UnmarshalJSON converts this bool or schema object from a JSON structure
+func (soa *StringOrArray) UnmarshalJSON(data []byte) error {
+	var sa StringOrArray
+	if data[0] == '[' {
+		var a []string
+		if err := json.Unmarshal(data, &a); err != nil {
+			return err
+		}
+		sa.Array = a
+	} else {
+		sa.String = string(data)
+	}
+
+	*soa = sa
+	return nil
+}
+
 // JSONSchema is the base interface that represents common json-schema attributes.
 type JSONSchema interface {
 	Clone() JSONSchema
 	GetSchemaURI() string
 	GetID() string
-	GetType() string
+	GetType() *StringOrArray
 	GetRef() string
 	GetTitle() string
 	GetDescription() string
@@ -34,6 +89,7 @@ type JSONSchema interface {
 	SetOneOf(items []JSONSchema)
 	SetNot(not JSONSchema)
 	SetDefault(def interface{})
+	SetType(typeList string)
 }
 
 // BasicSchema is the base implementation of the JsonSchema interface.
@@ -41,7 +97,7 @@ type basicSchema struct {
 	SchemaURI    string                `json:"$schema,omitempty"`
 	ID           string                `json:"id,omitempty"`
 	Ref          string                `json:"$ref,omitempty"`
-	JSONType     string                `json:"type,omitempty"`
+	JSONType     *StringOrArray        `json:"type,omitempty"`
 	Title        string                `json:"title,omitempty"`
 	Description  string                `json:"description,omitempty"`
 	AllOf        []JSONSchema          `json:"allOf,omitempty"`
@@ -83,6 +139,9 @@ func FromJSON(js []byte) (JSONSchema, error) {
 		case SchemaTypeBoolean:
 			obj = &defaultSimpleSchema{}
 			err = json.Unmarshal(js, obj)
+		default:
+			obj = &defaultSimpleSchema{}
+			err = json.Unmarshal(js, obj)
 		}
 	}
 
@@ -97,13 +156,16 @@ func FromJSON(js []byte) (JSONSchema, error) {
 
 // NewBasicSchema creates a new BasicSchema
 func NewBasicSchema(jsonType string) JSONSchema {
-	return &basicSchema{
-		JSONType:    jsonType,
+	bs := &basicSchema{
 		AllOf:       make([]JSONSchema, 0),
 		AnyOf:       make([]JSONSchema, 0),
 		OneOf:       make([]JSONSchema, 0),
 		Definitions: make(map[string]JSONSchema),
 	}
+
+	bs.SetType(jsonType)
+
+	return bs
 }
 
 func (s *basicSchema) UnmarshalJSON(b []byte) error {
@@ -127,7 +189,7 @@ func (s *basicSchema) UnmarshalJSON(b []byte) error {
 			case "$ref":
 				s.Ref = v.(string)
 			case "type":
-				s.JSONType = v.(string)
+				s.JSONType = NewStringOrArray(v)
 			case "title":
 				s.Title = v.(string)
 			case "description":
@@ -217,7 +279,7 @@ func (s *basicSchema) GetID() string {
 	return s.ID
 }
 
-func (s *basicSchema) GetType() string {
+func (s *basicSchema) GetType() *StringOrArray {
 	return s.JSONType
 }
 
@@ -298,4 +360,18 @@ func (s *basicSchema) SetNot(not JSONSchema) {
 
 func (s *basicSchema) SetDefault(def interface{}) {
 	s.DefaultValue = def
+}
+
+func (s *basicSchema) SetType(typeList string) {
+	if len(strings.TrimSpace(typeList)) < 1 {
+		return
+	}
+
+	types := strings.Split(typeList, ",")
+
+	if len(types) > 1 {
+		s.JSONType = &StringOrArray{Array: types}
+	} else {
+		s.JSONType = &StringOrArray{String: types[0]}
+	}
 }

@@ -384,6 +384,28 @@ func (g *JSONSchemaGenerator) addArrayAttrsForField(schema schema.ArraySchema, f
 	return nil
 }
 
+func (g *JSONSchemaGenerator) ensureProperTypeForInterfaceField(sch schema.JSONSchema, field *ast.Field) error {
+	schemaAnno, err := g.findJSONSchemaAnnotationForField(field)
+	if err != nil {
+		return err
+	}
+
+	if schemaAnno == nil {
+		return nil
+	}
+
+	if len(schemaAnno.schemaType) > 0 {
+		if len(schemaAnno.schemaType) == 1 {
+			sch.SetType(schemaAnno.schemaType[0])
+		} else {
+			sch.SetType(strings.Join(schemaAnno.schemaType, ","))
+		}
+
+	}
+
+	return nil
+}
+
 func (g *JSONSchemaGenerator) addObjectAttrsForDecl(sch schema.ObjectSchema, decl *declInfo) error {
 	if decl == nil {
 		return nil
@@ -400,7 +422,6 @@ func (g *JSONSchemaGenerator) addObjectAttrsForDecl(sch schema.ObjectSchema, dec
 	}
 
 	schemaAnno, err := g.findJSONSchemaAnnotationForDecl(decl)
-
 	if err != nil {
 		return err
 	}

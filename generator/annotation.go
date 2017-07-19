@@ -43,6 +43,7 @@ type schemaAnno struct {
 	allOf                []string
 	oneOf                []string
 	anyOf                []string
+	schemaType           []string
 	not                  string
 	additionalProperties *boolOrPath
 	additionalItems      bool
@@ -65,10 +66,11 @@ type schemaAnnoFactory struct {
 
 func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]string) (ganno.Annotation, error) {
 	anno := &schemaAnno{
-		attrs: attrs,
-		allOf: make([]string, 0),
-		anyOf: make([]string, 0),
-		oneOf: make([]string, 0),
+		attrs:      attrs,
+		allOf:      make([]string, 0),
+		anyOf:      make([]string, 0),
+		oneOf:      make([]string, 0),
+		schemaType: make([]string, 0),
 	}
 
 	for k, v := range attrs {
@@ -223,6 +225,14 @@ func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]st
 					anno.oneOf = append(anno.oneOf, item)
 				} else {
 					return nil, fmt.Errorf("error setting @jsonSchema 'oneOf': '%s' is not a valid ident or type selector", item)
+				}
+			}
+		case "type":
+			for _, item := range v {
+				if isJSONType(item) {
+					anno.schemaType = append(anno.schemaType, item)
+				} else {
+					return nil, fmt.Errorf("error setting @jsonSchema 'type': '%s' is not a valid JSON type", item)
 				}
 			}
 
