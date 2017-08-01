@@ -17,7 +17,7 @@ type StringOrArray struct {
 	Array  []string
 }
 
-// NewBoolOrSchema creates a *BoolOrSchema based on the given interface.
+// NewStringOrArray creates a *StringOrArray based on the given interface.
 func NewStringOrArray(v interface{}) *StringOrArray {
 	s, ok := v.(string)
 	if ok {
