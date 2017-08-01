@@ -142,7 +142,7 @@ func (suite *ErrorCaseTestSuite) TestArraySimpleType() {
 
 	aliases := s.(schema.ObjectSchema).GetProperties()["Aliases"].(schema.ArraySchema)
 
-	assert.Equal(suite.T(), "string", aliases.GetItems().GetType())
+	assert.Equal(suite.T(), "string", aliases.GetItems().GetType().String)
 }
 
 func (suite *ErrorCaseTestSuite) TestMaximumError() {
