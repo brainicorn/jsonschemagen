@@ -203,7 +203,7 @@ func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]st
 
 		case "allof":
 			for _, item := range v {
-				if isIdent(item) || isPackageType(item) {
+				if isSelfRef(item) || isIdent(item) || isPackageType(item) {
 					anno.allOf = append(anno.allOf, item)
 				} else {
 					return nil, fmt.Errorf("error setting @jsonSchema 'allOf': '%s' is not a valid ident or type selector", item)
@@ -212,7 +212,7 @@ func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]st
 
 		case "anyof":
 			for _, item := range v {
-				if isIdent(item) || isPackageType(item) {
+				if isSelfRef(item) || isIdent(item) || isPackageType(item) {
 					anno.anyOf = append(anno.anyOf, item)
 				} else {
 					return nil, fmt.Errorf("error setting @jsonSchema 'anyOf': '%s' is not a valid ident or type selector", item)
@@ -221,7 +221,7 @@ func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]st
 
 		case "oneof":
 			for _, item := range v {
-				if isIdent(item) || isPackageType(item) {
+				if isSelfRef(item) || isIdent(item) || isPackageType(item) {
 					anno.oneOf = append(anno.oneOf, item)
 				} else {
 					return nil, fmt.Errorf("error setting @jsonSchema 'oneOf': '%s' is not a valid ident or type selector", item)

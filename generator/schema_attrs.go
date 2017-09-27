@@ -175,7 +175,7 @@ func (g *JSONSchemaGenerator) addDocsForField(schema schema.JSONSchema, decl *de
 	}
 }
 
-func (g *JSONSchemaGenerator) addCommonAttrsForField(schema schema.JSONSchema, field *ast.Field) error {
+func (g *JSONSchemaGenerator) addCommonAttrsForField(schema schema.JSONSchema, field *ast.Field, parentKey string) error {
 	if field == nil {
 		return nil
 	}
@@ -193,10 +193,10 @@ func (g *JSONSchemaGenerator) addCommonAttrsForField(schema schema.JSONSchema, f
 		return nil
 	}
 
-	return g.addCommonAttrs(schema, schemaAnno, fieldName)
+	return g.addCommonAttrs(schema, schemaAnno, fieldName, parentKey)
 }
 
-func (g *JSONSchemaGenerator) addCommonAttrsForDecl(schema schema.JSONSchema, decl *declInfo) error {
+func (g *JSONSchemaGenerator) addCommonAttrsForDecl(schema schema.JSONSchema, decl *declInfo, parentKey string) error {
 	if decl == nil {
 		return nil
 	}
@@ -213,10 +213,10 @@ func (g *JSONSchemaGenerator) addCommonAttrsForDecl(schema schema.JSONSchema, de
 		return nil
 	}
 
-	return g.addCommonAttrs(schema, schemaAnno, declName)
+	return g.addCommonAttrs(schema, schemaAnno, declName, parentKey)
 }
 
-func (g *JSONSchemaGenerator) addCommonAttrs(schema schema.JSONSchema, anno *schemaAnno, name string) error {
+func (g *JSONSchemaGenerator) addCommonAttrs(schema schema.JSONSchema, anno *schemaAnno, name string, parentKey string) error {
 	if anno.defaultValue != "" {
 		schema.SetDefault(anno.defaultValue)
 	}
@@ -230,7 +230,7 @@ func (g *JSONSchemaGenerator) addCommonAttrs(schema schema.JSONSchema, anno *sch
 	}
 
 	if len(anno.allOf) > 0 {
-		schemas, err := g.generateSchemasFromTypePaths(anno.allOf)
+		schemas, err := g.generateSchemasFromTypePaths(anno.allOf, parentKey)
 		if err != nil {
 			return fmt.Errorf("error setting 'allOf' for %s: %s", name, err.Error())
 		}
@@ -238,7 +238,7 @@ func (g *JSONSchemaGenerator) addCommonAttrs(schema schema.JSONSchema, anno *sch
 	}
 
 	if len(anno.anyOf) > 0 {
-		schemas, err := g.generateSchemasFromTypePaths(anno.anyOf)
+		schemas, err := g.generateSchemasFromTypePaths(anno.anyOf, parentKey)
 		if err != nil {
 			return fmt.Errorf("error setting 'anyOf' for %s: %s", name, err.Error())
 		}
@@ -246,7 +246,7 @@ func (g *JSONSchemaGenerator) addCommonAttrs(schema schema.JSONSchema, anno *sch
 	}
 
 	if len(anno.oneOf) > 0 {
-		schemas, err := g.generateSchemasFromTypePaths(anno.oneOf)
+		schemas, err := g.generateSchemasFromTypePaths(anno.oneOf, parentKey)
 		if err != nil {
 			return fmt.Errorf("error setting 'oneOf' for %s: %s", name, err.Error())
 		}
@@ -254,7 +254,7 @@ func (g *JSONSchemaGenerator) addCommonAttrs(schema schema.JSONSchema, anno *sch
 	}
 
 	if anno.not != "" {
-		schemas, err := g.generateSchemasFromTypePaths([]string{anno.not})
+		schemas, err := g.generateSchemasFromTypePaths([]string{anno.not}, parentKey)
 		if err != nil {
 			return fmt.Errorf("error setting 'not' for %s: %s", name, err.Error())
 		}
@@ -406,7 +406,7 @@ func (g *JSONSchemaGenerator) ensureProperTypeForInterfaceField(sch schema.JSONS
 	return nil
 }
 
-func (g *JSONSchemaGenerator) addObjectAttrsForDecl(sch schema.ObjectSchema, decl *declInfo) error {
+func (g *JSONSchemaGenerator) addObjectAttrsForDecl(sch schema.ObjectSchema, decl *declInfo, parentKey string) error {
 	if decl == nil {
 		return nil
 	}
@@ -446,14 +446,14 @@ func (g *JSONSchemaGenerator) addObjectAttrsForDecl(sch schema.ObjectSchema, dec
 		if aprops.isBool {
 			sch.SetAdditionalProperties(schema.NewBoolOrSchema(aprops.boolean))
 		} else {
-			schemaItem, err := g.generateSchemaFromTypePath(aprops.path)
+			schemaItem, err := g.generateSchemaFromTypePath(aprops.path, parentKey)
 			if err != nil {
 				return err
 			}
 			sch.SetAdditionalProperties(schema.NewBoolOrSchema(schemaItem))
 		}
 	}
-	return g.addCommonAttrs(sch, schemaAnno, decl.typeSpec.Name.Name)
+	return g.addCommonAttrs(sch, schemaAnno, decl.typeSpec.Name.Name, parentKey)
 
 }
 
@@ -527,15 +527,22 @@ func (g *JSONSchemaGenerator) findJSONSchemaAnnotationForDecl(decl *declInfo) (*
 	return decl.schemaAnnotation, nil
 }
 
-func (g *JSONSchemaGenerator) generateSchemasFromTypePaths(paths []string) ([]schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateSchemasFromTypePaths(paths []string, parentKey string) ([]schema.JSONSchema, error) {
 	var schemas []schema.JSONSchema
 	var err error
 
 	for _, path := range paths {
 
 		var schemaItem schema.JSONSchema
-
-		schemaItem, err = g.generateSchemaFromTypePath(path)
+		defKey := g.defKeyFromPath(path)
+		g.LogVerbose("path: ", path)
+		g.LogVerbose("defKey: ", defKey)
+		if path == "#" || defKey == parentKey {
+			g.LogVerbose("got self ref")
+			schemaItem = generateSelfRef()
+		} else {
+			schemaItem, err = g.generateSchemaFromTypePath(path, parentKey)
+		}
 
 		if schemaItem != nil {
 			schemas = append(schemas, schemaItem)
@@ -547,7 +554,7 @@ func (g *JSONSchemaGenerator) generateSchemasFromTypePaths(paths []string) ([]sc
 	return schemas, err
 }
 
-func (g *JSONSchemaGenerator) generateSchemaFromTypePath(path string) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateSchemaFromTypePath(path string, parentKey string) (schema.JSONSchema, error) {
 	var err error
 
 	var schemaItem schema.JSONSchema
@@ -556,7 +563,7 @@ func (g *JSONSchemaGenerator) generateSchemaFromTypePath(path string) (schema.JS
 	var ok bool
 
 	if isIdent(path) {
-		if tmpSchema, ok, err = g.generateSchemaForBuiltIn(path, nil); ok {
+		if tmpSchema, ok, err = g.generateSchemaForBuiltIn(path, nil, parentKey); ok {
 			schemaItem = tmpSchema
 		}
 	} else {
@@ -565,7 +572,7 @@ func (g *JSONSchemaGenerator) generateSchemaFromTypePath(path string) (schema.JS
 		if pkgInfo != nil {
 			typeDecl, err = g.findDeclInfoForPackage(pkgInfo, nil, typeName)
 			if err == nil {
-				tmpSchema, err = g.generateSchemaForExpr(typeDecl, typeDecl.typeSpec.Type, nil)
+				tmpSchema, err = g.generateSchemaForExpr(typeDecl, typeDecl.typeSpec.Type, nil, parentKey)
 				if err == nil {
 					schemaItem = tmpSchema
 				}

@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	goparser "go/parser"
 	"go/types"
+	"strings"
 	"time"
 
 	"github.com/brainicorn/ganno"
@@ -82,6 +83,18 @@ func (g *JSONSchemaGenerator) newDeclInfo(pkg *loader.PackageInfo, file *ast.Fil
 	di.defKey = g.getDefinitionKey(di)
 
 	return di
+}
+
+func (g *JSONSchemaGenerator) defKeyFromPath(path string) string {
+	if !isPackageType(path) {
+		return ""
+	}
+
+	defKey := g.options.DefinitionPrefix + path
+	defKey = strings.Replace(defKey, ".", "_", -1)
+	defKey = strings.Replace(defKey, "/", "-", -1)
+
+	return defKey
 }
 
 func (g *JSONSchemaGenerator) loadProgram(basePackage string, options Options) (*loader.Program, error) {
@@ -168,7 +181,7 @@ func (g *JSONSchemaGenerator) doGenerate() (schema.JSONSchema, error) {
 
 	if err == nil {
 		g.LogVerbose("root decl: ", rootDeclInfo.typeSpec.Name.Name)
-		rootSchema, err = g.generateSchemaForExpr(rootDeclInfo, rootDeclInfo.typeSpec.Type, nil)
+		rootSchema, err = g.generateSchemaForExpr(rootDeclInfo, rootDeclInfo.typeSpec.Type, nil, rootDeclInfo.defKey)
 	}
 
 	if err == nil {
@@ -231,7 +244,7 @@ func (g *JSONSchemaGenerator) findRootDecl(program *loader.Program) (*declInfo, 
 
 }
 
-func (g *JSONSchemaGenerator) generateObjectSchema(declInfo *declInfo, field *ast.Field, embedded bool) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateObjectSchema(declInfo *declInfo, field *ast.Field, embedded bool, parentKey string) (schema.JSONSchema, error) {
 	g.LogDebugF("processing object schema for struct %s\n", declInfo.defKey)
 
 	var err error
@@ -266,7 +279,7 @@ func (g *JSONSchemaGenerator) generateObjectSchema(declInfo *declInfo, field *as
 		return nil, err
 	}
 
-	err = g.addObjectAttrsForDecl(objectSchema, declInfo)
+	err = g.addObjectAttrsForDecl(objectSchema, declInfo, parentKey)
 
 	if err != nil {
 		return nil, err
@@ -278,7 +291,7 @@ func (g *JSONSchemaGenerator) generateObjectSchema(declInfo *declInfo, field *as
 
 		if len(propField.Names) == 0 {
 			g.LogVerbose("processing field without a name, must be embedded...")
-			embeddedSchema, e := g.generateEmbeddedSchema(declInfo, propField.Type)
+			embeddedSchema, e := g.generateEmbeddedSchema(declInfo, propField.Type, parentKey)
 
 			if e != nil {
 				err = e
@@ -301,7 +314,7 @@ func (g *JSONSchemaGenerator) generateObjectSchema(declInfo *declInfo, field *as
 				continue
 			}
 
-			fschema, e := g.generateSchemaForExpr(declInfo, propField.Type, propField)
+			fschema, e := g.generateSchemaForExpr(declInfo, propField.Type, propField, declInfo.defKey)
 
 			if e != nil {
 				err = e
@@ -337,7 +350,7 @@ func (g *JSONSchemaGenerator) generateObjectSchema(declInfo *declInfo, field *as
 	return objectSchema, err
 }
 
-func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldExpr ast.Expr, field *ast.Field) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldExpr ast.Expr, field *ast.Field, parentKey string) (schema.JSONSchema, error) {
 	var foundDecl *declInfo
 	var err error
 	var ok bool
@@ -358,12 +371,12 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 		case *ast.StructType:
 			g.LogVerbose("field type is struct: ")
 
-			generatedSchema, err = g.generateObjectSchema(ownerDecl, field, false)
+			generatedSchema, err = g.generateObjectSchema(ownerDecl, field, false, parentKey)
 
 		case *ast.Ident:
-			g.LogVerbose("field type is ident: ", fieldType.Name)
+			g.LogVerbose(fmt.Sprintf("field type is ident: %s, %s", fieldType.Name, ownerDecl.defKey))
 
-			if simpleSchema, ok, err = g.generateSchemaForBuiltIn(fieldType.Name, field); ok {
+			if simpleSchema, ok, err = g.generateSchemaForBuiltIn(fieldType.Name, field, parentKey); ok {
 				generatedSchema = simpleSchema
 				break
 			}
@@ -386,7 +399,7 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 				if jsonType, found := builtinTypes[types.ExprString(foundDecl.typeSpec.Type)]; found {
 					g.LogVerbose("found decl is a simple type: ", jsonType)
 
-					if simpleSchema, ok, err = g.generateSchemaForBuiltIn(types.ExprString(foundDecl.typeSpec.Type), field); ok {
+					if simpleSchema, ok, err = g.generateSchemaForBuiltIn(types.ExprString(foundDecl.typeSpec.Type), field, parentKey); ok {
 
 						g.LogVerbose("got a simpleSchema for ", fieldType.Name)
 						anno, simpleErr := g.findJSONSchemaAnnotationForDecl(foundDecl)
@@ -413,7 +426,7 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 					}
 
 				}
-				generatedSchema, err = g.generateSchemaForExpr(foundDecl, foundDecl.typeSpec.Type, field)
+				generatedSchema, err = g.generateSchemaForExpr(foundDecl, foundDecl.typeSpec.Type, field, parentKey)
 			}
 
 		case *ast.StarExpr:
@@ -428,7 +441,7 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 				}
 			}
 
-			generatedSchema, err = g.generateSchemaForExpr(ownerDecl, fieldType.X, field)
+			generatedSchema, err = g.generateSchemaForExpr(ownerDecl, fieldType.X, field, parentKey)
 
 		case *ast.SelectorExpr:
 			g.LogVerboseF("got selector expression type %s.%s\n", fieldType.X, fieldType.Sel.Name)
@@ -439,7 +452,7 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 				break
 			}
 
-			if simpleSchema, ok, err = g.generateSchemaForBuiltIn(fullSelectorName, field); ok {
+			if simpleSchema, ok, err = g.generateSchemaForBuiltIn(fullSelectorName, field, parentKey); ok {
 				generatedSchema = simpleSchema
 				break
 			}
@@ -449,38 +462,38 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 			}
 
 			if err == nil {
-				generatedSchema, err = g.generateSchemaForExpr(foundDecl, foundDecl.typeSpec.Type, field)
+				generatedSchema, err = g.generateSchemaForExpr(foundDecl, foundDecl.typeSpec.Type, field, parentKey)
 			}
 
 		case *ast.ArrayType:
 			g.LogVerbose("got array type ")
-			generatedSchema, err = g.generateArraySchema(ownerDecl, fieldType.Elt, field)
+			generatedSchema, err = g.generateArraySchema(ownerDecl, fieldType.Elt, field, parentKey)
 
 		case *ast.InterfaceType:
-			g.LogVerbose("got interface type ")
+			g.LogVerbose("got interface type ", field)
 
 			if field != nil {
-				generatedSchema, err = g.generateInterfaceSchemaForField(ownerDecl, field)
+				generatedSchema, err = g.generateInterfaceSchemaForField(ownerDecl, field, parentKey)
 				break
 			}
 
-			generatedSchema, err = g.generateInterfaceSchemaForDecl(ownerDecl)
+			generatedSchema, err = g.generateInterfaceSchemaForDecl(ownerDecl, parentKey)
 
 		case *ast.MapType:
 			g.LogVerbose("got map type ")
 			if field != nil {
-				generatedSchema, err = g.generateInterfaceSchemaForField(ownerDecl, field)
+				generatedSchema, err = g.generateInterfaceSchemaForField(ownerDecl, field, parentKey)
 				break
 			}
 
-			generatedSchema, err = g.generateInterfaceSchemaForDecl(ownerDecl)
+			generatedSchema, err = g.generateInterfaceSchemaForDecl(ownerDecl, parentKey)
 		}
 	}
 
 	if err == nil {
 		fieldSchema = generatedSchema.Clone()
 		if field != nil {
-			g.addCommonAttrsForField(fieldSchema, field)
+			g.addCommonAttrsForField(fieldSchema, field, parentKey)
 		}
 
 		g.addDocsForField(fieldSchema, foundDecl, field)
@@ -489,7 +502,7 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 	return fieldSchema, err
 }
 
-func (g *JSONSchemaGenerator) generateEmbeddedSchema(ownerDecl *declInfo, expr ast.Expr) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateEmbeddedSchema(ownerDecl *declInfo, expr ast.Expr, parentKey string) (schema.JSONSchema, error) {
 	var embeddedDecl *declInfo
 
 	switch embeddedType := expr.(type) {
@@ -504,18 +517,18 @@ func (g *JSONSchemaGenerator) generateEmbeddedSchema(ownerDecl *declInfo, expr a
 		embeddedDecl, _ = g.findDeclInfoForSelector(ownerDecl, embeddedType)
 
 	case *ast.StarExpr:
-		return g.generateEmbeddedSchema(ownerDecl, embeddedType.X)
+		return g.generateEmbeddedSchema(ownerDecl, embeddedType.X, parentKey)
 	}
 
 	switch embeddedDecl.typeSpec.Type.(type) {
 	case *ast.StructType:
-		return g.generateObjectSchema(embeddedDecl, nil, true)
+		return g.generateObjectSchema(embeddedDecl, nil, true, parentKey)
 
 	}
 	return nil, fmt.Errorf("unable to resolve embedded struct for: %#v", expr)
 }
 
-func (g *JSONSchemaGenerator) generateSchemaForBuiltIn(name string, field *ast.Field) (schema.JSONSchema, bool, error) {
+func (g *JSONSchemaGenerator) generateSchemaForBuiltIn(name string, field *ast.Field, parentKey string) (schema.JSONSchema, bool, error) {
 	var err error
 	var simpleSchema schema.JSONSchema
 	var jsonType string
@@ -531,7 +544,7 @@ func (g *JSONSchemaGenerator) generateSchemaForBuiltIn(name string, field *ast.F
 
 	if found {
 		g.LogVerbose("found built-in type ", jsonType)
-		simpleSchema, err = g.generateSimpleSchema(name, jsonType, field)
+		simpleSchema, err = g.generateSimpleSchema(name, jsonType, field, parentKey)
 		if err == nil {
 			g.LogVerbose("returning simple schema ", jsonType)
 			return simpleSchema, true, err
@@ -541,7 +554,7 @@ func (g *JSONSchemaGenerator) generateSchemaForBuiltIn(name string, field *ast.F
 	return nil, false, err
 }
 
-func (g *JSONSchemaGenerator) generateSimpleSchema(goType, jsonType string, field *ast.Field) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateSimpleSchema(goType, jsonType string, field *ast.Field, parentKey string) (schema.JSONSchema, error) {
 	var err error
 
 	switch jsonType {
@@ -568,7 +581,7 @@ func (g *JSONSchemaGenerator) generateSimpleSchema(goType, jsonType string, fiel
 	return ss, err
 }
 
-func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr ast.Expr, field *ast.Field) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr ast.Expr, field *ast.Field, parentKey string) (schema.JSONSchema, error) {
 	var err error
 	var elemSchema schema.JSONSchema
 
@@ -577,7 +590,7 @@ func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr 
 	err = g.addArrayAttrsForField(arraySchema, field)
 	g.LogDebug("generating schema for array elem expr: ", elemExpr)
 	if err == nil {
-		elemSchema, err = g.generateSchemaForExpr(ownerDecl, elemExpr, nil)
+		elemSchema, err = g.generateSchemaForExpr(ownerDecl, elemExpr, nil, parentKey)
 	}
 
 	if err == nil {
@@ -588,7 +601,7 @@ func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr 
 
 }
 
-func (g *JSONSchemaGenerator) generateInterfaceSchemaForField(decl *declInfo, field *ast.Field) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateInterfaceSchemaForField(decl *declInfo, field *ast.Field, parentKey string) (schema.JSONSchema, error) {
 	var err error
 	var hasAnno, fhasXof, dhasAnno bool
 	var iSchema schema.JSONSchema
@@ -605,10 +618,10 @@ func (g *JSONSchemaGenerator) generateInterfaceSchemaForField(decl *declInfo, fi
 		g.LogVerbose("hasAnno?: ", hasAnno)
 		if !hasAnno {
 			iSchema = schema.NewMapSchema(g.options.SupressXAttrs)
-			err = g.addCommonAttrsForDecl(iSchema, decl)
+			err = g.addCommonAttrsForDecl(iSchema, decl, parentKey)
 		} else {
 			iSchema = schema.NewObjectSchema(g.options.SupressXAttrs)
-			err = g.addObjectAttrsForDecl(iSchema.(schema.ObjectSchema), decl)
+			err = g.addObjectAttrsForDecl(iSchema.(schema.ObjectSchema), decl, parentKey)
 		}
 
 		if err == nil {
@@ -618,17 +631,17 @@ func (g *JSONSchemaGenerator) generateInterfaceSchemaForField(decl *declInfo, fi
 	return iSchema, err
 }
 
-func (g *JSONSchemaGenerator) generateInterfaceSchemaForDecl(decl *declInfo) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateInterfaceSchemaForDecl(decl *declInfo, parentKey string) (schema.JSONSchema, error) {
 	var err error
 	//var hasXof bool
 	var iSchema schema.JSONSchema
 	iSchema = schema.NewObjectSchema(g.options.SupressXAttrs)
-	err = g.addObjectAttrsForDecl(iSchema.(schema.ObjectSchema), decl)
+	err = g.addObjectAttrsForDecl(iSchema.(schema.ObjectSchema), decl, parentKey)
 
 	return iSchema, err
 }
 
-func (g *JSONSchemaGenerator) generateMapSchema(field *ast.Field) (schema.JSONSchema, error) {
+func (g *JSONSchemaGenerator) generateMapSchema(field *ast.Field, parentKey string) (schema.JSONSchema, error) {
 	mSchema := schema.NewMapSchema(g.options.SupressXAttrs)
 
 	return mSchema, nil

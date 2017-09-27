@@ -102,6 +102,10 @@ func isJSONType(name string) bool {
 	return ok
 }
 
+func isSelfRef(name string) bool {
+	return name == "#"
+}
+
 func isIdent(name string) bool {
 	ident := true
 

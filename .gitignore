@@ -17,3 +17,6 @@ vendor/
 profile.out
 coverage.txt
 jsonschemagen
+.coverage
+.env
+all.html
