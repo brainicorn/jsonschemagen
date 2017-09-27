@@ -594,6 +594,12 @@ func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr 
 	}
 
 	if err == nil {
+		if _, isObj := elemSchema.(schema.ObjectSchema); isObj {
+			err = g.ensureProperTypeForInterfaceField(elemSchema, field)
+		}
+	}
+
+	if err == nil {
 		arraySchema.SetItems(elemSchema)
 	}
 

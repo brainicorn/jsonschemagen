@@ -385,6 +385,7 @@ func (g *JSONSchemaGenerator) addArrayAttrsForField(schema schema.ArraySchema, f
 }
 
 func (g *JSONSchemaGenerator) ensureProperTypeForInterfaceField(sch schema.JSONSchema, field *ast.Field) error {
+	g.LogVerbose("ensuring proper interface type for field ", field.Names[0].Name)
 	schemaAnno, err := g.findJSONSchemaAnnotationForField(field)
 	if err != nil {
 		return err
@@ -396,6 +397,7 @@ func (g *JSONSchemaGenerator) ensureProperTypeForInterfaceField(sch schema.JSONS
 
 	if len(schemaAnno.schemaType) > 0 {
 		if len(schemaAnno.schemaType) == 1 {
+			g.LogVerbose("found type on anno ", schemaAnno.schemaType)
 			sch.SetType(schemaAnno.schemaType[0])
 		} else {
 			sch.SetType(strings.Join(schemaAnno.schemaType, ","))

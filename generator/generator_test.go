@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/brainicorn/ganno"
@@ -128,6 +129,7 @@ func (suite *GeneratorTestSuite) TestArrayAttrs() {
 	min := songsAry.GetMinItems()
 	add := songsAry.GetAdditionalItems()
 	unq := songsAry.GetUniqueItems()
+	fmt.Println("songs type", songsAry.GetType())
 
 	assert.Equal(suite.T(), int64(50), max, "songs should have maxItems of 50 but got %d", max)
 	assert.Equal(suite.T(), int64(1), min, "songs should have minItems of 1 but got %d", min)
