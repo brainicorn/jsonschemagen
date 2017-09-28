@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/brainicorn/ganno"
@@ -129,12 +130,15 @@ func (suite *GeneratorTestSuite) TestArrayAttrs() {
 	min := songsAry.GetMinItems()
 	add := songsAry.GetAdditionalItems()
 	unq := songsAry.GetUniqueItems()
-	fmt.Println("songs type", songsAry.GetType())
+
+	numsongsAry := jsonSchema.(schema.ObjectSchema).GetProperties()["numtracks"].(schema.ArraySchema)
+	numsongsType := strings.Join(numsongsAry.GetItems().GetType().Array, ",")
 
 	assert.Equal(suite.T(), int64(50), max, "songs should have maxItems of 50 but got %d", max)
 	assert.Equal(suite.T(), int64(1), min, "songs should have minItems of 1 but got %d", min)
 	assert.Equal(suite.T(), false, add, "songs should have additionalItems of false but got %t", add)
 	assert.Equal(suite.T(), true, unq, "songs should have uniqueItems of true but got %t", unq)
+	assert.EqualValues(suite.T(), "string,number,integer", numsongsType, "numsongsType should have correct types %t", numsongsType)
 }
 
 func (suite *GeneratorTestSuite) TestStringAttrs() {
