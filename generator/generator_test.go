@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
