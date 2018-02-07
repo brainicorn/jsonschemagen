@@ -24,7 +24,7 @@ The general rules for writing annotations are:
 
 ## Annotation Specifics ##
 
-If you just want to see some code, you can refer to [A Complex, Annotated Type Structure We Use To Test This Tool](https://github.com/brainicorn/schematestobjects/src)
+If you just want to see some code, you can refer to [A Complex, Annotated Type Structure We Use To Test This Tool](https://github.com/brainicorn/schematestobjects)
 
 ### Titles and Descriptions ###
 JSON Schema nodes can contain "title" and "description" keywords and by default the jsonschemagen tool will auto-fill in the values for these based on GoDoc comments.
