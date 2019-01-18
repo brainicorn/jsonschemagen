@@ -436,7 +436,7 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 			if field != nil {
 				fieldStarExpr := fieldExpr.(*ast.StarExpr)
 				if types.ExprString(fieldStarExpr.X) == ownerDecl.typeSpec.Name.Name {
-					generatedSchema = generateSelfRef()
+					generatedSchema = generateSelfRef("")
 					break
 				}
 			}
@@ -448,7 +448,8 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 			fullSelectorName := fmt.Sprintf("%s.%s", fieldType.X, fieldType.Sel.Name)
 
 			if "json.RawMessage" == fullSelectorName {
-				generatedSchema = schema.NewMapSchema(g.options.SupressXAttrs)
+				//generatedSchema = schema.NewMapSchema(g.options.SupressXAttrs)
+				generatedSchema = schema.NewBasicSchema("")
 				break
 			}
 
@@ -473,10 +474,11 @@ func (g *JSONSchemaGenerator) generateSchemaForExpr(ownerDecl *declInfo, fieldEx
 			g.LogVerbose("got interface type ", field)
 
 			if field != nil {
+				g.LogInfo("schema for field")
 				generatedSchema, err = g.generateInterfaceSchemaForField(ownerDecl, field, parentKey)
 				break
 			}
-
+			g.LogInfo("schema for decl")
 			generatedSchema, err = g.generateInterfaceSchemaForDecl(ownerDecl, parentKey)
 
 		case *ast.MapType:
@@ -574,6 +576,9 @@ func (g *JSONSchemaGenerator) generateSimpleSchema(goType, jsonType string, fiel
 		err = g.addNumericAttrsForField(ss, field)
 
 		return ss, err
+	case "any":
+		ss := schema.NewBasicSchema("")
+		return ss, err
 	}
 
 	ss := schema.NewSimpleSchema(jsonType)
@@ -590,6 +595,10 @@ func (g *JSONSchemaGenerator) generateArraySchema(ownerDecl *declInfo, elemExpr 
 	err = g.addArrayAttrsForField(arraySchema, field)
 	g.LogDebug("generating schema for array elem expr: ", elemExpr)
 	if err == nil {
+		g.LogInfo("owner of array: ", parentKey)
+		g.LogInfo("parent key for array: ", ownerDecl.defKey)
+		g.LogInfo("elem for array: ", elemExpr)
+		g.LogInfo("--------------------------------")
 		elemSchema, err = g.generateSchemaForExpr(ownerDecl, elemExpr, nil, parentKey)
 	}
 
@@ -653,9 +662,14 @@ func (g *JSONSchemaGenerator) generateMapSchema(field *ast.Field, parentKey stri
 	return mSchema, nil
 }
 
-func generateSelfRef() schema.JSONSchema {
+func generateSelfRef(ref string) schema.JSONSchema {
 	refSchema := schema.NewBasicSchema("")
-	refSchema.SetRef("#")
+
+	if len(ref) < 1 {
+		refSchema.SetRef("#")
+	} else {
+		refSchema.SetRef("#/definitions/" + ref)
+	}
 
 	return refSchema
 }

@@ -39,6 +39,7 @@ var jsonTypes = map[string][]string{
 	"number":  []string{"float32", "float64"},
 	"integer": []string{"int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64"},
 	"array":   []string{},
+	"any":   []string{},
 }
 
 func (g *JSONSchemaGenerator) findDeclInfoForPackage(pkg *loader.PackageInfo, file *ast.File, typeToFind string) (*declInfo, error) {

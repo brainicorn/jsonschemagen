@@ -371,7 +371,9 @@ func (s *basicSchema) SetType(typeList string) {
 
 	if len(types) > 1 {
 		s.JSONType = &StringOrArray{Array: types}
-	} else {
+	} else if types[0] != "any"{
 		s.JSONType = &StringOrArray{String: types[0]}
+	} else {
+		s.JSONType = nil
 	}
 }

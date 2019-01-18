@@ -34,6 +34,7 @@ type schemaAnno struct {
 	maxLength            int64
 	minLength            int64
 	pattern              string
+	enum                 []string
 	maxItems             int64
 	minItems             int64
 	uniqueItems          bool
@@ -71,6 +72,7 @@ func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]st
 		anyOf:      make([]string, 0),
 		oneOf:      make([]string, 0),
 		schemaType: make([]string, 0),
+		enum: make([]string, 0),
 	}
 
 	for k, v := range attrs {
@@ -200,6 +202,11 @@ func (f *schemaAnnoFactory) ValidateAndCreate(name string, attrs map[string][]st
 				return nil, fmt.Errorf("error setting @jsonSchema 'minProperties': %s", err)
 			}
 			anno.minProperties = i
+
+		case "enum":
+			for _, item := range v {
+				anno.enum = append(anno.enum, item)
+			}
 
 		case "allof":
 			for _, item := range v {

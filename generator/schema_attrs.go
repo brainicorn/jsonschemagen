@@ -399,6 +399,10 @@ func (g *JSONSchemaGenerator) ensureProperTypeForInterfaceField(sch schema.JSONS
 		if len(schemaAnno.schemaType) == 1 {
 			g.LogVerbose("found type on anno ", schemaAnno.schemaType)
 			sch.SetType(schemaAnno.schemaType[0])
+			if schemaAnno.schemaType[0] == "any" {
+				sch.(schema.ObjectSchema).SetAdditionalProperties(nil)
+			}
+
 		} else {
 			sch.SetType(strings.Join(schemaAnno.schemaType, ","))
 		}
@@ -537,11 +541,16 @@ func (g *JSONSchemaGenerator) generateSchemasFromTypePaths(paths []string, paren
 
 		var schemaItem schema.JSONSchema
 		defKey := g.defKeyFromPath(path)
-		g.LogVerbose("path: ", path)
-		g.LogVerbose("defKey: ", defKey)
+		g.LogInfo("path: ", path)
+		g.LogInfo("defKey: ", defKey)
 		if path == "#" || defKey == parentKey {
-			g.LogVerbose("got self ref")
-			schemaItem = generateSelfRef()
+			g.LogInfo("got self ref")
+			if defKey == parentKey {
+				schemaItem = generateSelfRef(parentKey)
+			} else {
+				schemaItem = generateSelfRef("")
+			}
+
 		} else {
 			schemaItem, err = g.generateSchemaFromTypePath(path, parentKey)
 		}
