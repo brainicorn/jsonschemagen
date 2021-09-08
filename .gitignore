@@ -20,3 +20,4 @@ jsonschemagen
 .coverage
 .env
 all.html
+.vscode

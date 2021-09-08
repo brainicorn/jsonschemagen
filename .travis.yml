@@ -4,11 +4,10 @@ go:
   - 1.8.x
 
 install:
-  - go get github.com/Masterminds/glide
-  - glide --no-color up
-  - go get -u github.com/alecthomas/gometalinter
+  - go mod download
+  - go install github.com/alecthomas/gometalinter
   - gometalinter --install
-  - go get github.com/wadey/gocovmerge
+  - go install github.com/wadey/gocovmerge
 
 script:
   - gometalinter --vendor --disable-all --enable=vet --enable=goimports --enable=vetshadow --enable=golint --enable=ineffassign --enable=goconst --tests ./...
